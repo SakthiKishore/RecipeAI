@@ -1,7 +1,6 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState, useRef } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList } from 'react-native';
-import { GestureDetector, Gesture, Directions } from 'react-native-gesture-handler';
+import { useState, useRef, useEffect } from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions } from 'react-native';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -9,6 +8,10 @@ export default function App() {
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  useEffect(() => {
+    console.log('Captured Images:', capturedImages);
+  }, [capturedImages]);
 
   if (!permission) {
     // Camera permissions are still loading.
@@ -33,38 +36,34 @@ export default function App() {
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync();
       if (photo) {
+        console.log('Photo taken:', photo.uri);
         setCapturedImages(prev => [...prev, photo.uri]);
       }
     }
   }
 
-  const swipeGesture = Gesture.Fling()
-    .direction(Directions.UP)
-    .onStart(() => {
-      console.log('Swipe gesture started');
-    })
-    .onEnd(() => {
-      console.log('Swipe gesture ended');
-      if (capturedImages.length > 0) {
-        setShowPreview(true);
-      }
-    });
+  const renderItem = ({ item }: { item: string }) => (
+    <View style={styles.imageContainer}>
+      <Image source={{ uri: item }} style={styles.preview} />
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      <GestureDetector gesture={swipeGesture}>
-        {showPreview ? (
-          <View style={styles.previewContainer}>
-            <FlatList
-              data={capturedImages}
-              renderItem={({ item }) => <Image source={{ uri: item }} style={styles.preview} />}
-              keyExtractor={(item, index) => index.toString()}
-            />
-            <TouchableOpacity style={styles.button} onPress={() => setShowPreview(false)}>
-              <Text style={styles.text}>Back to Camera</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
+      {showPreview ? (
+        <View style={styles.previewContainer}>
+          <FlatList
+            data={capturedImages}
+            renderItem={renderItem}
+            keyExtractor={(item, index) => index.toString()}
+            numColumns={2}
+          />
+          <TouchableOpacity style={styles.button} onPress={() => setShowPreview(false)}>
+            <Text style={styles.text}>Back to Camera</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.cameraContainer}>
           <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
             <View style={styles.buttonContainer}>
               <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
@@ -75,11 +74,20 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </CameraView>
-        )}
-      </GestureDetector>
+          <TouchableOpacity 
+            style={[styles.button, styles.doneButton]} 
+            onPress={() => setShowPreview(true)}
+          >
+            <Text style={styles.text}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
+
+const { width } = Dimensions.get('window');
+const imageSize = width / 2 - 15;
 
 const styles = StyleSheet.create({
   container: {
@@ -111,12 +119,26 @@ const styles = StyleSheet.create({
   },
   previewContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 10,
+  },
+  imageContainer: {
+    margin: 5,
   },
   preview: {
-    width: '100%',
-    height: '80%',
+    width: imageSize,
+    height: imageSize,
+    borderRadius: 10,
+  },
+  cameraContainer: {
+    flex: 1,
+  },
+  doneButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
+    borderRadius: 5,
   },
 });
 
