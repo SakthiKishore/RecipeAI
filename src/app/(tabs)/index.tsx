@@ -1,6 +1,6 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView } from 'react-native';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -51,17 +51,18 @@ export default function App() {
   return (
     <View style={styles.container}>
       {showPreview ? (
-        <View style={styles.previewContainer}>
+        <ScrollView contentContainerStyle={styles.scrollViewContent}>
           <FlatList
             data={capturedImages}
             renderItem={renderItem}
             keyExtractor={(item, index) => index.toString()}
             numColumns={2}
+            scrollEnabled={false}
           />
-          <TouchableOpacity style={styles.button} onPress={() => setShowPreview(false)}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setShowPreview(false)}>
             <Text style={styles.text}>Back to Camera</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       ) : (
         <View style={styles.cameraContainer}>
           <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
@@ -139,6 +140,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 10,
     borderRadius: 5,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
   },
 });
 
