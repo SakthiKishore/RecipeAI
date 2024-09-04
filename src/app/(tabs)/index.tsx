@@ -1,12 +1,15 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator } from 'react-native';
+import { getRecipeFromImages } from '../../utils/openai';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [recipe, setRecipe] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -42,6 +45,19 @@ export default function App() {
     }
   }
 
+  async function generateRecipe() {
+    setIsLoading(true);
+    try {
+      const generatedRecipe = await getRecipeFromImages(capturedImages);
+      setRecipe(generatedRecipe);
+    } catch (error) {
+      console.error('Error generating recipe:', error);
+      setRecipe('Failed to generate recipe. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   const renderItem = ({ item }: { item: string }) => (
     <View style={styles.imageContainer}>
       <Image source={{ uri: item }} style={styles.preview} />
@@ -59,8 +75,29 @@ export default function App() {
             numColumns={2}
             scrollEnabled={false}
           />
-          <TouchableOpacity style={styles.backButton} onPress={() => setShowPreview(false)}>
-            <Text style={styles.text}>Back to Camera</Text>
+          {recipe && (
+            <View style={styles.recipeContainer}>
+              <Text style={styles.recipeText}>{recipe}</Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={generateRecipe} 
+            disabled={isLoading}
+          >
+            <Text style={styles.actionButtonText}>
+              {isLoading ? 'Generating...' : 'Generate Recipe'}
+            </Text>
+          </TouchableOpacity>
+          {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => {
+              setShowPreview(false);
+              setRecipe(null);
+            }}
+          >
+            <Text style={styles.actionButtonText}>Back to Camera</Text>
           </TouchableOpacity>
         </ScrollView>
       ) : (
@@ -151,6 +188,29 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginTop: 20,
+  },
+  recipeContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 10,
+  },
+  recipeText: {
+    fontSize: 16,
+    color: 'black',
+  },
+  actionButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+    width: '100%', // Make sure the button spans the full width
+  },
+  actionButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
   },
 });
 
