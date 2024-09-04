@@ -1,6 +1,6 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator, Modal, SafeAreaView, Platform } from 'react-native';
 import { getRecipeFromImages } from '../../utils/openai';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -12,6 +12,7 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [recipe, setRecipe] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -33,36 +34,25 @@ export default function App() {
     );
   }
 
-  function toggleCameraFacing() {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
-  }
-
   async function takePicture() {
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync();
       if (photo) {
-        console.log('Original photo dimensions:', photo.width, 'x', photo.height);
-        
-        // Get file information of the original image
         const originalFileInfo = await FileSystem.getInfoAsync(photo.uri);
-        if (originalFileInfo.exists) {
-          console.log('Original photo size:', originalFileInfo.size, 'bytes');
-        }
-        
-        // Resize the image
+        console.log(`Original photo dimensions: ${photo.width} x ${photo.height}`);
+        console.log(`Original photo size: ${originalFileInfo.exists ? originalFileInfo.size : 'unknown'} bytes`);
+
         const resizedPhoto = await ImageManipulator.manipulateAsync(
           photo.uri,
           [{ resize: { width: 1024 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          { compress: 0.01, format: ImageManipulator.SaveFormat.JPEG }
         );
-        
-        console.log('Resized photo dimensions:', resizedPhoto.width, 'x', resizedPhoto.height);
-        
-        // Get file information of the resized image
+
+        console.log(`Resized photo URL: ${resizedPhoto.uri}`);
+        console.log(`Resized photo dimensions: ${resizedPhoto.width} x ${resizedPhoto.height}`);
+
         const resizedFileInfo = await FileSystem.getInfoAsync(resizedPhoto.uri);
-        if (resizedFileInfo.exists) {
-          console.log('Resized photo size:', resizedFileInfo.size, 'bytes');
-        }
+        console.log(`Resized photo size: ${resizedFileInfo.exists ? resizedFileInfo.size : 'unknown'} bytes`);
 
         setCapturedImages(prev => [...prev, resizedPhoto.uri]);
       }
@@ -83,67 +73,98 @@ export default function App() {
   }
 
   const renderItem = ({ item }: { item: string }) => (
-    <View style={styles.imageContainer}>
+    <TouchableOpacity 
+      style={styles.imageContainer} 
+      onPress={() => setFullScreenImage(item)}
+    >
       <Image source={{ uri: item }} style={styles.preview} />
-    </View>
+    </TouchableOpacity>
   );
+
+  const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
+  const aspectRatio = 1769 / 1024;
+  const cameraHeight = screenWidth * aspectRatio;
 
   return (
     <View style={styles.container}>
       {showPreview ? (
-        <ScrollView contentContainerStyle={styles.scrollViewContent}>
-          <FlatList
-            data={capturedImages}
-            renderItem={renderItem}
-            keyExtractor={(item, index) => index.toString()}
-            numColumns={2}
-            scrollEnabled={false}
-          />
-          {recipe && (
-            <View style={styles.recipeContainer}>
-              <Text style={styles.recipeText}>{recipe}</Text>
-            </View>
-          )}
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={generateRecipe} 
-            disabled={isLoading}
-          >
-            <Text style={styles.actionButtonText}>
-              {isLoading ? 'Generating...' : 'Generate Recipe'}
-            </Text>
-          </TouchableOpacity>
-          {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => {
-              setShowPreview(false);
-              setRecipe(null);
-            }}
-          >
-            <Text style={styles.actionButtonText}>Back to Camera</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        <View style={styles.previewContainer}>
+          <ScrollView contentContainerStyle={styles.scrollViewContent}>
+            <FlatList
+              data={capturedImages}
+              renderItem={renderItem}
+              keyExtractor={(item, index) => index.toString()}
+              numColumns={2}
+              scrollEnabled={false}
+            />
+            {recipe && (
+              <View style={styles.recipeContainer}>
+                <Text style={styles.recipeText}>{recipe}</Text>
+              </View>
+            )}
+          </ScrollView>
+          <View style={styles.bottomButtonContainer}>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={generateRecipe} 
+              disabled={isLoading}
+            >
+              <Text style={styles.actionButtonText}>
+                {isLoading ? 'Generating...' : 'Generate Recipe'}
+              </Text>
+            </TouchableOpacity>
+            {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => {
+                setShowPreview(false);
+                setRecipe(null);
+              }}
+            >
+              <Text style={styles.actionButtonText}>Back to Camera</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : (
         <View style={styles.cameraContainer}>
-          <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-                <Text style={styles.text}>Flip Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={takePicture}>
-                <Text style={styles.text}>Take Picture</Text>
-              </TouchableOpacity>
-            </View>
-          </CameraView>
-          <TouchableOpacity 
-            style={[styles.button, styles.doneButton]} 
-            onPress={() => setShowPreview(true)}
+          <CameraView
+            ref={cameraRef}
+            style={[styles.camera, { height: cameraHeight }]}
+            facing={facing}
+            ratio="16:9"
           >
-            <Text style={styles.text}>Done</Text>
-          </TouchableOpacity>
+            {/* Remove the buttonContainer and its contents */}
+          </CameraView>
+          <View style={styles.bottomButtonContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={takePicture}>
+              <Text style={styles.actionButtonText}>Take Picture</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => setShowPreview(true)}
+            >
+              <Text style={styles.actionButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
+      
+      <Modal visible={!!fullScreenImage} animationType="slide">
+        <SafeAreaView style={styles.fullScreenContainer}>
+          {fullScreenImage && (
+            <Image source={{ uri: fullScreenImage }} style={styles.fullScreenImage} />
+          )}
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => setFullScreenImage(null)}
+          >
+            <Text style={styles.backButtonText}>
+              {Platform.OS === 'ios' ? '◀ Back' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -161,27 +182,23 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   camera: {
-    flex: 1,
-  },
-  buttonContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: 'transparent',
-    margin: 64,
+    width: '100%',
   },
   button: {
-    flex: 1,
-    alignSelf: 'flex-end',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10, // Add space between buttons
   },
   text: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
   },
   previewContainer: {
     flex: 1,
-    padding: 10,
   },
   imageContainer: {
     margin: 5,
@@ -193,23 +210,44 @@ const styles = StyleSheet.create({
   },
   cameraContainer: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  doneButton: {
+  bottomButtonContainer: {
     position: 'absolute',
     bottom: 20,
     right: 20,
+    alignItems: 'flex-end',
+  },
+  actionButton: {
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 10,
+    padding: 15,
     borderRadius: 5,
+    marginBottom: 10,
+    width: 150,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
   },
   scrollViewContent: {
     flexGrow: 1,
-    justifyContent: 'space-between',
+    padding: 20,
+    paddingBottom: 100, // Add extra padding at the bottom for buttons
+  },
+  buttonContainer: {
+    marginTop: 20,
+    alignItems: 'center',
   },
   backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 20,
+    left: 20,
+    padding: 10,
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 10,
     borderRadius: 5,
     marginTop: 20,
   },
@@ -223,18 +261,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'black',
   },
-  actionButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 20,
-    width: '100%', // Make sure the button spans the full width
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: 'black',
   },
-  actionButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  fullScreenImage: {
+    flex: 1,
+    resizeMode: 'contain',
+  },
+  backButtonText: {
     color: 'white',
+    fontSize: 18,
   },
 });
 
