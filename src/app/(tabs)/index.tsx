@@ -1,9 +1,11 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator, Modal, SafeAreaView, Platform } from 'react-native';
+import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator, Modal, SafeAreaView } from 'react-native';
 import { getRecipeFromImages } from '../../utils/openai';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Ionicons } from '@expo/vector-icons'; 
+import { Picker } from '@react-native-picker/picker';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -13,6 +15,9 @@ export default function App() {
   const [recipe, setRecipe] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [mealType, setMealType] = useState('Breakfast');
+  const [dietaryRestrictions, setDietaryRestrictions] = useState('');
+
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -45,7 +50,7 @@ export default function App() {
         const resizedPhoto = await ImageManipulator.manipulateAsync(
           photo.uri,
           [{ resize: { width: 1024 } }],
-          { compress: 0.01, format: ImageManipulator.SaveFormat.JPEG }
+          { compress: 0.0, format: ImageManipulator.SaveFormat.JPEG }
         );
 
         console.log(`Resized photo URL: ${resizedPhoto.uri}`);
@@ -62,7 +67,7 @@ export default function App() {
   async function generateRecipe() {
     setIsLoading(true);
     try {
-      const generatedRecipe = await getRecipeFromImages(capturedImages);
+      const generatedRecipe = await getRecipeFromImages(capturedImages, mealType, dietaryRestrictions);
       setRecipe(generatedRecipe);
     } catch (error) {
       console.error('Error generating recipe:', error);
@@ -90,40 +95,64 @@ export default function App() {
     <View style={styles.container}>
       {showPreview ? (
         <View style={styles.previewContainer}>
-          <ScrollView contentContainerStyle={styles.scrollViewContent}>
+          <ScrollView style={styles.scrollView}>
             <FlatList
               data={capturedImages}
               renderItem={renderItem}
               keyExtractor={(item, index) => index.toString()}
-              numColumns={2}
-              scrollEnabled={false}
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.imageList}
             />
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Meal Type:</Text>
+              <Picker
+                selectedValue={mealType}
+                onValueChange={(itemValue) => setMealType(itemValue)}
+                style={styles.picker}
+              >
+                {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((option) => (
+                  <Picker.Item key={option} label={option} value={option} />
+                ))}
+              </Picker>
+
+              <Text style={styles.inputLabel}>Dietary Restrictions or Allergies:</Text>
+              <TextInput
+                style={styles.textInput}
+                value={dietaryRestrictions}
+                onChangeText={setDietaryRestrictions}
+                placeholder="Enter any dietary restrictions..."
+              />
+            </View>
+
             {recipe && (
               <View style={styles.recipeContainer}>
                 <Text style={styles.recipeText}>{recipe}</Text>
               </View>
             )}
           </ScrollView>
+          
           <View style={styles.bottomButtonContainer}>
             <TouchableOpacity 
-              style={styles.actionButton} 
-              onPress={generateRecipe} 
-              disabled={isLoading}
-            >
-              <Text style={styles.actionButtonText}>
-                {isLoading ? 'Generating...' : 'Generate Recipe'}
-              </Text>
-            </TouchableOpacity>
-            {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
-            <TouchableOpacity 
-              style={styles.actionButton} 
+              style={styles.circleButton} 
               onPress={() => {
                 setShowPreview(false);
                 setRecipe(null);
               }}
             >
-              <Text style={styles.actionButtonText}>Back to Camera</Text>
+              <Ionicons name="camera" size={30} color="white" />
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.circleButton, styles.cookButton]} 
+              onPress={generateRecipe} 
+              disabled={isLoading}
+            >
+              <Text style={styles.cookButtonText}>
+                {isLoading ? 'Cooking...' : "Let's\ncook"}
+              </Text>
+            </TouchableOpacity>
+            {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
           </View>
         </View>
       ) : (
@@ -137,14 +166,14 @@ export default function App() {
             {/* Remove the buttonContainer and its contents */}
           </CameraView>
           <View style={styles.bottomButtonContainer}>
-            <TouchableOpacity style={styles.actionButton} onPress={takePicture}>
-              <Text style={styles.actionButtonText}>Take Picture</Text>
+            <TouchableOpacity style={styles.circleButton} onPress={takePicture}>
+              <Ionicons name="camera" size={30} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.actionButton} 
+              style={styles.circleButton} 
               onPress={() => setShowPreview(true)}
             >
-              <Text style={styles.actionButtonText}>Done</Text>
+              <Ionicons name="checkmark" size={30} color="white" />
             </TouchableOpacity>
           </View>
         </View>
@@ -159,9 +188,7 @@ export default function App() {
             style={styles.backButton} 
             onPress={() => setFullScreenImage(null)}
           >
-            <Text style={styles.backButtonText}>
-              {Platform.OS === 'ios' ? '◀ Back' : 'Back'}
-            </Text>
+            <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
@@ -175,7 +202,6 @@ const imageSize = width / 2 - 15;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
   },
   message: {
     textAlign: 'center',
@@ -199,13 +225,21 @@ const styles = StyleSheet.create({
   },
   previewContainer: {
     flex: 1,
+    position: 'relative',
+  },
+  scrollView: {
+    flex: 1,
+    paddingBottom: 100, // Add padding to ensure content is not hidden behind buttons
+  },
+  imageList: {
+    paddingHorizontal: 10,
   },
   imageContainer: {
-    margin: 5,
+    marginHorizontal: 5,
   },
   preview: {
-    width: imageSize,
-    height: imageSize,
+    width: 150,
+    height: 150,
     borderRadius: 10,
   },
   cameraContainer: {
@@ -219,18 +253,25 @@ const styles = StyleSheet.create({
     right: 20,
     alignItems: 'flex-end',
   },
-  actionButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-    width: 150,
+  circleButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(128, 128, 128, 0.8)',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  actionButtonText: {
+  cookButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  cookButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
+    textAlign: 'center',
   },
   scrollViewContent: {
     flexGrow: 1,
@@ -243,19 +284,23 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 20,
-    left: 20,
-    padding: 10,
+    bottom: 30,
+    right: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(128, 128, 128, 0.8)', // More visible greyish color
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 5,
-    marginTop: 20,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 30, // Keep the larger font size
   },
   recipeContainer: {
+    flex: 1,
     marginTop: 20,
-    padding: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 10,
+    paddingHorizontal: 20,
   },
   recipeText: {
     fontSize: 16,
@@ -269,9 +314,28 @@ const styles = StyleSheet.create({
     flex: 1,
     resizeMode: 'contain',
   },
-  backButtonText: {
-    color: 'white',
-    fontSize: 18,
+  inputContainer: {
+    padding: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+  },
+  picker: {
+    marginBottom: 20,
   },
 });
 

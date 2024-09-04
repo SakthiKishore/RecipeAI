@@ -5,7 +5,6 @@ const OPENAI_API_KEY = 'sk-proj-wNj3pTSPnze8CobayZXyYWtLnK3hLqwtbIvvg6oAGDha_Y4A
 
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true, // Add this line if you're running in a browser environment
 });
 
 async function imageToBase64(uri: string): Promise<string> {
@@ -15,7 +14,7 @@ async function imageToBase64(uri: string): Promise<string> {
   return `data:image/jpeg;base64,${base64}`;
 }
 
-export async function getRecipeFromImages(imageUris: string[]): Promise<string> {
+export async function getRecipeFromImages(imageUris: string[], mealType: string, dietaryRestrictions: string): Promise<string> {
   try {
     const imageContents = await Promise.all(imageUris.map(async (uri) => ({
       type: "image_url" as const,
@@ -30,7 +29,7 @@ export async function getRecipeFromImages(imageUris: string[]): Promise<string> 
         {
           role: "user",
           content: [
-            { type: "text", text: "Give me a recipe based on the items you find in the image(s)" },
+            { type: "text", text: `Give me a ${mealType} recipe based on the items you find in the image(s). ${dietaryRestrictions ? `Please consider the following dietary restrictions: ${dietaryRestrictions}.` : ''}` },
             ...imageContents,
           ],
         },
