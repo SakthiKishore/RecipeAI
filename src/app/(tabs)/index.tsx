@@ -2,6 +2,8 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator } from 'react-native';
 import { getRecipeFromImages } from '../../utils/openai';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export default function App() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -22,7 +24,7 @@ export default function App() {
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
+    // Camera permissions are not granted yet.ß
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
@@ -39,8 +41,30 @@ export default function App() {
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync();
       if (photo) {
-        console.log('Photo taken:', photo.uri);
-        setCapturedImages(prev => [...prev, photo.uri]);
+        console.log('Original photo dimensions:', photo.width, 'x', photo.height);
+        
+        // Get file information of the original image
+        const originalFileInfo = await FileSystem.getInfoAsync(photo.uri);
+        if (originalFileInfo.exists) {
+          console.log('Original photo size:', originalFileInfo.size, 'bytes');
+        }
+        
+        // Resize the image
+        const resizedPhoto = await ImageManipulator.manipulateAsync(
+          photo.uri,
+          [{ resize: { width: 1024 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        
+        console.log('Resized photo dimensions:', resizedPhoto.width, 'x', resizedPhoto.height);
+        
+        // Get file information of the resized image
+        const resizedFileInfo = await FileSystem.getInfoAsync(resizedPhoto.uri);
+        if (resizedFileInfo.exists) {
+          console.log('Resized photo size:', resizedFileInfo.size, 'bytes');
+        }
+
+        setCapturedImages(prev => [...prev, resizedPhoto.uri]);
       }
     }
   }
