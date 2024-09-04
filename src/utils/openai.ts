@@ -29,7 +29,7 @@ export async function getRecipeFromImages(imageUris: string[], mealType: string,
         {
           role: "user",
           content: [
-            { type: "text", text: `Give me a ${mealType} recipe based on the items you find in the image(s). ${dietaryRestrictions ? `Please consider the following dietary restrictions: ${dietaryRestrictions}.` : ''}` },
+            { type: "text", text: `You are a seasoned chef with over 20 years of experience. Give me a ${mealType} recipe based on the items you find in the image(s). The recipe should be time tested, delicious, and easy to make and quick to prepare. ${dietaryRestrictions ? `Please consider the following dietary restrictions: ${dietaryRestrictions}.` : ''}` },
             ...imageContents,
           ],
         },

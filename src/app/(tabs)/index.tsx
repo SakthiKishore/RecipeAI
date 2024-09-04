@@ -1,14 +1,15 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator, Modal, SafeAreaView } from 'react-native';
+import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View, Image, FlatList, Dimensions, ScrollView, ActivityIndicator, Modal, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { getRecipeFromImages } from '../../utils/openai';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons'; 
 import { Picker } from '@react-native-picker/picker';
+import { Keyboard } from 'react-native';
 
 export default function App() {
-  const [facing, setFacing] = useState<CameraType>('back');
+  const [facing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [showPreview, setShowPreview] = useState(false);
@@ -17,12 +18,35 @@ export default function App() {
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const [mealType, setMealType] = useState('Breakfast');
   const [dietaryRestrictions, setDietaryRestrictions] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
     console.log('Captured Images:', capturedImages);
   }, [capturedImages]);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   if (!permission) {
     // Camera permissions are still loading.
@@ -94,16 +118,30 @@ export default function App() {
   return (
     <View style={styles.container}>
       {showPreview ? (
-        <View style={styles.previewContainer}>
-          <ScrollView style={styles.scrollView}>
-            <FlatList
-              data={capturedImages}
-              renderItem={renderItem}
-              keyExtractor={(item, index) => index.toString()}
-              horizontal={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.imageList}
-            />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.previewContainer}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+        >
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={[
+              styles.scrollViewContent,
+              keyboardVisible && { paddingBottom: 300 } // Adjust this value as needed
+            ]}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.imageListContainer}>
+              <FlatList
+                data={capturedImages}
+                renderItem={renderItem}
+                keyExtractor={(item, index) => index.toString()}
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.imageList}
+              />
+            </View>
             
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Meal Type:</Text>
@@ -123,6 +161,7 @@ export default function App() {
                 value={dietaryRestrictions}
                 onChangeText={setDietaryRestrictions}
                 placeholder="Enter any dietary restrictions..."
+                multiline={true}
               />
             </View>
 
@@ -141,7 +180,7 @@ export default function App() {
                 setRecipe(null);
               }}
             >
-              <Ionicons name="camera" size={30} color="white" />
+              <Ionicons name="arrow-back" size={30} color="white" />
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.circleButton, styles.cookButton]} 
@@ -154,7 +193,7 @@ export default function App() {
             </TouchableOpacity>
             {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       ) : (
         <View style={styles.cameraContainer}>
           <CameraView
@@ -225,11 +264,17 @@ const styles = StyleSheet.create({
   },
   previewContainer: {
     flex: 1,
-    position: 'relative',
   },
   scrollView: {
     flex: 1,
-    paddingBottom: 100, // Add padding to ensure content is not hidden behind buttons
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 150, // Increased padding to account for buttons
+  },
+  imageListContainer: {
+    height: 170, // Adjust this value based on your image size
+    marginBottom: 20,
   },
   imageList: {
     paddingHorizontal: 10,
@@ -273,15 +318,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
   },
-  scrollViewContent: {
-    flexGrow: 1,
-    padding: 20,
-    paddingBottom: 100, // Add extra padding at the bottom for buttons
-  },
-  buttonContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
   backButton: {
     position: 'absolute',
     bottom: 30,
@@ -295,7 +331,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: 'white',
-    fontSize: 30, // Keep the larger font size
+    fontSize: 30,
   },
   recipeContainer: {
     flex: 1,
@@ -322,10 +358,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
+  picker: {
+    marginBottom: 20,
   },
   textInput: {
     borderWidth: 1,
@@ -334,8 +368,4 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 20,
   },
-  picker: {
-    marginBottom: 20,
-  },
 });
-
