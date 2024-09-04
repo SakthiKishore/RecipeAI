@@ -7,6 +7,9 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons'; 
 import { Picker } from '@react-native-picker/picker';
 import { Keyboard } from 'react-native';
+import { useColorScheme } from '@/src/components/useColorScheme';
+import { Text as ThemedText, View as ThemedView } from '@/src/components/Themed';
+import Colors from '@/src/constants/Colors';
 
 export default function App() {
   const [facing] = useState<CameraType>('back');
@@ -20,6 +23,7 @@ export default function App() {
   const [dietaryRestrictions, setDietaryRestrictions] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const colorScheme = useColorScheme();
 
   const cameraRef = useRef<CameraView>(null);
 
@@ -116,7 +120,7 @@ export default function App() {
   const cameraHeight = screenWidth * aspectRatio;
 
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       {showPreview ? (
         <KeyboardAvoidingView 
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -143,32 +147,44 @@ export default function App() {
               />
             </View>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Meal Type:</Text>
+            <ThemedView style={styles.inputContainer}>
+              <ThemedText style={styles.inputLabel}>Meal Type:</ThemedText>
               <Picker
                 selectedValue={mealType}
                 onValueChange={(itemValue) => setMealType(itemValue)}
-                style={styles.picker}
+                style={[styles.picker, { color: Colors[colorScheme ?? 'light'].text }]}
               >
                 {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((option) => (
-                  <Picker.Item key={option} label={option} value={option} />
+                  <Picker.Item 
+                    key={option} 
+                    label={option} 
+                    value={option} 
+                    color={Colors[colorScheme ?? 'light'].text}
+                  />
                 ))}
               </Picker>
 
-              <Text style={styles.inputLabel}>Dietary Restrictions or Allergies:</Text>
+              <ThemedText style={styles.inputLabel}>Dietary Restrictions or Allergies:</ThemedText>
               <TextInput
-                style={styles.textInput}
+                style={[
+                  styles.textInput, 
+                  { 
+                    color: Colors[colorScheme ?? 'light'].text, 
+                    borderColor: Colors[colorScheme ?? 'light'].border 
+                  }
+                ]}
                 value={dietaryRestrictions}
                 onChangeText={setDietaryRestrictions}
                 placeholder="Enter any dietary restrictions..."
+                placeholderTextColor={Colors[colorScheme ?? 'light'].text}
                 multiline={true}
               />
-            </View>
+            </ThemedView>
 
             {recipe && (
-              <View style={styles.recipeContainer}>
-                <Text style={styles.recipeText}>{recipe}</Text>
-              </View>
+              <ThemedView style={styles.recipeContainer}>
+                <ThemedText style={styles.recipeText}>{recipe}</ThemedText>
+              </ThemedView>
             )}
           </ScrollView>
           
@@ -219,7 +235,7 @@ export default function App() {
       )}
       
       <Modal visible={!!fullScreenImage} animationType="slide">
-        <SafeAreaView style={styles.fullScreenContainer}>
+        <SafeAreaView style={[styles.fullScreenContainer, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
           {fullScreenImage && (
             <Image source={{ uri: fullScreenImage }} style={styles.fullScreenImage} />
           )}
@@ -227,11 +243,11 @@ export default function App() {
             style={styles.backButton} 
             onPress={() => setFullScreenImage(null)}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <ThemedText style={styles.backButtonText}>←</ThemedText>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
-    </View>
+    </ThemedView>
   );
 }
 
@@ -363,7 +379,6 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#ccc',
     borderRadius: 5,
     padding: 10,
     marginBottom: 20,
