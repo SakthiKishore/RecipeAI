@@ -8,12 +8,14 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "vercel-build": "expo export -p web"
+    "vercel-build": "expo export:web",
+    "build": "expo export:web"
   },
   "jest": {
     "preset": "jest-expo"
   },
   "dependencies": {
+    "@expo/server": "^0.4.4",
     "@expo/vector-icons": "^14.0.2",
     "@react-native-picker/picker": "^2.8.0",
     "@react-navigation/native": "^6.0.2",
