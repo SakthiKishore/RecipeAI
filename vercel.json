@@ -1,0 +1,12 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "api/handler.ts",
+        "use": "@vercel/node"
+      }
+    ],
+    "rewrites": [
+      { "source": "/api/handler", "destination": "/api/handler.ts" }
+    ]
+  }
