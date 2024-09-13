@@ -10,98 +10,130 @@ import { Keyboard } from 'react-native';
 import { useColorScheme } from '@/components/useColorScheme';
 import { Text as ThemedText, View as ThemedView } from '@/components/Themed';
 import Colors from '@/constants/Colors';
+import 'react-native-url-polyfill/auto'
+import { supabase } from '../../utils/supabase'
+import Auth from '../../components/Auth'
+import { Session } from '@supabase/supabase-js'
 
 export default function App() {
-  const [facing] = useState<CameraType>('back');
-  const [permission, requestPermission] = useCameraPermissions();
-  const [capturedImages, setCapturedImages] = useState<string[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
-  const [recipe, setRecipe] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
-  const [mealType, setMealType] = useState('Breakfast');
-  const [dietaryRestrictions, setDietaryRestrictions] = useState('');
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const colorScheme = useColorScheme();
-
-  const cameraRef = useRef<CameraView>(null);
+  const [session, setSession] = useState<Session | null>(null)
 
   useEffect(() => {
-    console.log('Captured Images:', capturedImages);
-  }, [capturedImages]);
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    // Listen for changes in auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [])
+
+  if (!session) {
+    // User is not logged in, show Auth component
+    return <Auth />
+  }
+
+  // User is logged in, show Camera view
+  return <CameraViewComponent />
+}
+
+function CameraViewComponent() {
+  const [facing] = useState<CameraType>('back')
+  const [permission, requestPermission] = useCameraPermissions()
+  const [capturedImages, setCapturedImages] = useState<string[]>([])
+  const [showPreview, setShowPreview] = useState(false)
+  const [recipe, setRecipe] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null)
+  const [mealType, setMealType] = useState('Breakfast')
+  const [dietaryRestrictions, setDietaryRestrictions] = useState('')
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+  const scrollViewRef = useRef<ScrollView>(null)
+  const colorScheme = useColorScheme()
+
+  const cameraRef = useRef<CameraView>(null)
+
+  useEffect(() => {
+    console.log('Captured Images:', capturedImages)
+  }, [capturedImages])
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
       () => {
-        setKeyboardVisible(true);
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        setKeyboardVisible(true)
+        scrollViewRef.current?.scrollToEnd({ animated: true })
       }
-    );
+    )
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
-        setKeyboardVisible(false);
+        setKeyboardVisible(false)
       }
-    );
+    )
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
+      keyboardDidShowListener.remove()
+      keyboardDidHideListener.remove()
+    }
+  }, [])
 
   if (!permission) {
     // Camera permissions are still loading.
-    return <View />;
+    return <View />
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.ß
+    // Camera permissions are not granted yet.
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button onPress={requestPermission} title="grant permission" />
+        <Button onPress={requestPermission} title="Grant Permission" />
       </View>
-    );
+    )
   }
 
   async function takePicture() {
     if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
+      const photo = await cameraRef.current.takePictureAsync()
       if (photo) {
-        const originalFileInfo = await FileSystem.getInfoAsync(photo.uri);
-        console.log(`Original photo dimensions: ${photo.width} x ${photo.height}`);
-        console.log(`Original photo size: ${originalFileInfo.exists ? originalFileInfo.size : 'unknown'} bytes`);
+        const originalFileInfo = await FileSystem.getInfoAsync(photo.uri)
+        console.log(`Original photo dimensions: ${photo.width} x ${photo.height}`)
+        console.log(`Original photo size: ${originalFileInfo.exists ? originalFileInfo.size : 'unknown'} bytes`)
 
         const resizedPhoto = await ImageManipulator.manipulateAsync(
           photo.uri,
           [{ resize: { width: 1024 } }],
           { compress: 0.0, format: ImageManipulator.SaveFormat.JPEG }
-        );
+        )
 
-        console.log(`Resized photo URL: ${resizedPhoto.uri}`);
-        console.log(`Resized photo dimensions: ${resizedPhoto.width} x ${resizedPhoto.height}`);
+        console.log(`Resized photo URL: ${resizedPhoto.uri}`)
+        console.log(`Resized photo dimensions: ${resizedPhoto.width} x ${resizedPhoto.height}`)
 
-        const resizedFileInfo = await FileSystem.getInfoAsync(resizedPhoto.uri);
-        console.log(`Resized photo size: ${resizedFileInfo.exists ? resizedFileInfo.size : 'unknown'} bytes`);
+        const resizedFileInfo = await FileSystem.getInfoAsync(resizedPhoto.uri)
+        console.log(`Resized photo size: ${resizedFileInfo.exists ? resizedFileInfo.size : 'unknown'} bytes`)
 
-        setCapturedImages(prev => [...prev, resizedPhoto.uri]);
+        setCapturedImages(prev => [...prev, resizedPhoto.uri])
       }
     }
   }
 
   async function generateRecipe() {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const generatedRecipe = await getRecipeFromImages(capturedImages, mealType, dietaryRestrictions);
-      setRecipe(generatedRecipe);
+      const generatedRecipe = await getRecipeFromImages(capturedImages, mealType, dietaryRestrictions)
+      setRecipe(generatedRecipe)
     } catch (error) {
-      console.error('Error generating recipe:', error);
-      setRecipe('Failed to generate recipe. Please try again.');
+      console.error('Error generating recipe:', error)
+      setRecipe('Failed to generate recipe. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   }
 
@@ -112,12 +144,12 @@ export default function App() {
     >
       <Image source={{ uri: item }} style={styles.preview} />
     </TouchableOpacity>
-  );
+  )
 
-  const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height;
-  const aspectRatio = 1769 / 1024;
-  const cameraHeight = screenWidth * aspectRatio;
+  const screenWidth = Dimensions.get('window').width
+  const screenHeight = Dimensions.get('window').height
+  const aspectRatio = 1769 / 1024
+  const cameraHeight = screenWidth * aspectRatio
 
   return (
     <ThemedView style={styles.container}>
@@ -192,8 +224,8 @@ export default function App() {
             <TouchableOpacity 
               style={styles.circleButton} 
               onPress={() => {
-                setShowPreview(false);
-                setRecipe(null);
+                setShowPreview(false)
+                setRecipe(null)
               }}
             >
               <Ionicons name="arrow-back" size={30} color="white" />
@@ -248,11 +280,11 @@ export default function App() {
         </SafeAreaView>
       </Modal>
     </ThemedView>
-  );
+  )
 }
 
-const { width } = Dimensions.get('window');
-const imageSize = width / 2 - 15;
+const { width } = Dimensions.get('window')
+const imageSize = width / 2 - 15
 
 const styles = StyleSheet.create({
   container: {
@@ -383,4 +415,4 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 20,
   },
-});
+})
