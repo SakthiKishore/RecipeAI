@@ -9,7 +9,7 @@ async function imageToBase64(uri: string): Promise<string> {
 
 export async function getRecipeFromImages(imageUris: string[], mealType: string, dietaryRestrictions: string): Promise<string> {
   try {
-    const response = await fetch('https://recipeaibackend-7j98vimqc-sakthikishores-projects.vercel.app/api/handler', {
+    const response = await fetch('https://recipeaibackend-iri2c66zd-sakthikishores-projects.vercel.app/api/handler', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -21,23 +21,30 @@ export async function getRecipeFromImages(imageUris: string[], mealType: string,
       }),
     });
 
+    const responseText = await response.text();
+    console.log('Raw server response:', responseText);
+
     if (!response.ok) {
-      const text = await response.text();
-      console.error('Server responded with an error:', response.status, text);
-      return `Server error: ${response.status}. Please try again.`;
+      console.error('Server responded with an error:', response.status, responseText);
+      return `Server error: ${response.status}. Response: ${responseText}`;
     }
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('Unexpected content type:', contentType, text);
-      return 'Unexpected response from server. Please try again.';
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', parseError);
+      return `Failed to parse server response. Raw response: ${responseText}`;
     }
 
-    const data = await response.json();
-    return data.choices[0]?.message?.content || 'No recipe generated.';
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.error('Unexpected response structure:', data);
+      return `Unexpected response structure. Response: ${JSON.stringify(data)}`;
+    }
+
+    return data.choices[0].message.content;
   } catch (error) {
     console.error('Error calling backend:', error);
-    return 'Failed to generate recipe. Please try again.';
+    return `Failed to generate recipe. Error: ${(error as Error).message}`;
   }
 }

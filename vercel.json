@@ -1,11 +1,10 @@
 {
     "version": 2,
-    "builds": [
-      {
-        "src": "api/handler.ts",
-        "use": "@vercel/node"
-      }
-    ],
+    "functions": {
+        "api/handler.ts": {
+            "maxDuration": 25
+        }
+    },
     "rewrites": [
       { "source": "/api/handler", "destination": "/api/handler.ts" }
     ]
