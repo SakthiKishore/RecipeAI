@@ -9,7 +9,7 @@ async function imageToBase64(uri: string): Promise<string> {
 
 export async function getRecipeFromImages(imageUris: string[], mealType: string, dietaryRestrictions: string): Promise<string> {
   try {
-    const response = await fetch('https://recipeaibackend-iri2c66zd-sakthikishores-projects.vercel.app/api/handler', {
+    const response = await fetch('https://recipeaibackend.vercel.app/api/handler', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
