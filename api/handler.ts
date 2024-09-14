@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 type: 'text',
                 text: `You are a seasoned chef with over 20 years of experience. Give me a ${mealType} recipe based on the items you find in the image(s). The recipe should be time tested, delicious, and easy to make and quick to prepare. ${
                   dietaryRestrictions ? `Please consider the following dietary restrictions: ${dietaryRestrictions}.` : ''
-                }`
+                } After the recipe, provide a nutrition table with typical nutrition values for the recipe.`
               },
               ...imageContents
             ],
